@@ -1,0 +1,72 @@
+﻿<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Safety, limitations, and data handling policy for the platform." />
+  <title>Digital Ophthalmology Assistant | Safety</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script defer src="assets/icons.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body data-page="safety">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a class="brand" href="index.html"><span class="icon" data-icon="eye"></span>Digital Ophthalmology Assistant</a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Toggle navigation"><span class="icon" data-icon="settings"></span>Menu</button>
+      <nav id="site-nav" class="nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="diagnose.html">Diagnosis</a>
+        <a href="diseases.html">Disease Library</a>
+        <a href="education.html">Education</a>
+        <a href="safety.html" aria-current="page">Safety</a>
+        <a href="about.html">About</a>
+      </nav>
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle theme"><span class="icon theme-icon" data-icon="sun"></span></button>
+    </div>
+  </header>
+
+  <main id="main-content" class="section">
+    <div class="container stack">
+      <div class="warning-banner reveal reveal-up">
+        <span class="icon" data-icon="warning"></span>
+        <div class="stack">
+          <h1>Safety & Disclaimer</h1>
+          <p>This platform is for educational simulation and interface demonstration only.</p>
+        </div>
+      </div>
+
+      <div class="grid grid-2 stagger reveal reveal-up">
+        <article class="card stack">
+          <h2><span class="icon" data-icon="info"></span>Educational Purpose</h2>
+          <p class="small">The diagnostic output is simulated and intended to teach triage logic and interpretation flow.</p>
+        </article>
+        <article class="card stack">
+          <h2><span class="icon" data-icon="shield"></span>Not a Medical Diagnosis</h2>
+          <p class="small">Results must not replace physician examination, slit-lamp evaluation, or emergency care pathways.</p>
+        </article>
+        <article class="card stack">
+          <h2><span class="icon" data-icon="settings"></span>Data Handling in This Demo</h2>
+          <p class="small">All interactions run locally in the browser. No files are uploaded to a remote server in local demo mode.</p>
+        </article>
+        <article class="card stack">
+          <h2><span class="icon" data-icon="warning"></span>Model Limitations</h2>
+          <p class="small">Algorithmic systems can produce false positives/negatives due to image quality, bias, and domain shift.</p>
+        </article>
+      </div>
+
+      <article class="card reveal reveal-scale stack">
+        <h2>Clinical Escalation Advice</h2>
+        <p class="small">If severe pain, sudden vision loss, intense photophobia, trauma, or corneal opacity is present, seek urgent ophthalmology care immediately.</p>
+      </article>
+    </div>
+  </main>
+
+  <button id="back-to-top" class="back-to-top" type="button" aria-label="Back to top"><span class="icon" data-icon="chevron"></span></button>
+  <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="true"></div>
+  <footer class="footer"><div class="container"><p>Educational platform interface only. Not a substitute for licensed medical diagnosis.</p></div></footer>
+</body>
+</html>
+
+
