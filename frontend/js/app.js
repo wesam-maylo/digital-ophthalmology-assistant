@@ -3,6 +3,20 @@
 
   const STORAGE_THEME = "doa-theme";
   const STORAGE_HISTORY = "doa-history";
+  const DISEASES_DATA = {
+    normal: {
+      id: "normal",
+      name: "Normal",
+      name_ar: "طبيعي",
+      short: "Healthy anterior eye appearance with no obvious inflammatory or degenerative signs.",
+      short_ar: "مظهر طبيعي للجزء الأمامي من العين دون علامات واضحة لالتهاب أو تغيرات مرضية.",
+      symptoms_ar: ["لا يوجد ألم", "لا يوجد احمرار ملحوظ", "رؤية مستقرة وواضحة"],
+      red_flags_ar: ["انخفاض مفاجئ في الرؤية", "ألم شديد بالعين", "إصابة مباشرة أو صدمة للعين"],
+      safe_tips_ar: ["استخدم نظارات واقية من الأشعة فوق البنفسجية", "تجنب فرك العين باليد", "حافظ على الفحص الدوري للعين"],
+      when_to_see_doctor_ar: "راجع طبيب العيون فوراً عند ظهور ألم شديد أو احمرار مستمر أو تدهور مفاجئ في الرؤية.",
+      risk_level: "Low"
+    }
+  };
   let diseases = null;
 
   initIcons();
@@ -165,11 +179,11 @@
 
   async function loadDiseases() {
     try {
-      const response = await fetch("data/diseases.json");
+      const response = await fetch("../data/diseases.json");
       if (!response.ok) throw new Error("fetch failed");
       diseases = await response.json();
     } catch (_error) {
-      diseases = fallbackDiseases();
+      diseases = DISEASES_DATA;
     }
   }
 
@@ -595,23 +609,6 @@
     node.innerHTML = `<span class="icon">${getIconByName(icon)}</span><span>${escapeHtml(text)}</span>`;
     root.appendChild(node);
     setTimeout(() => node.remove(), 2800);
-  }
-
-  function fallbackDiseases() {
-    return {
-      normal: {
-        id: "normal",
-        name: "Normal",
-        name_ar: "طبيعي",
-        short: "Healthy anterior eye appearance with no obvious inflammatory or degenerative signs.",
-        short_ar: "مظهر طبيعي للجزء الأمامي من العين دون علامات واضحة لالتهاب أو تغيرات مرضية.",
-        symptoms_ar: ["لا يوجد ألم", "لا يوجد احمرار ملحوظ", "رؤية مستقرة وواضحة"],
-        red_flags_ar: ["انخفاض مفاجئ في الرؤية", "ألم شديد بالعين", "إصابة مباشرة أو صدمة للعين"],
-        safe_tips_ar: ["استخدم نظارات واقية من الأشعة فوق البنفسجية", "تجنب فرك العين باليد", "حافظ على الفحص الدوري للعين"],
-        when_to_see_doctor_ar: "راجع طبيب العيون فوراً عند ظهور ألم شديد أو احمرار مستمر أو تدهور مفاجئ في الرؤية.",
-        risk_level: "Low"
-      }
-    };
   }
 
   function byId(id) { return document.getElementById(id); }
