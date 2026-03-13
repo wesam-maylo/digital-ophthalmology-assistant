@@ -18,6 +18,7 @@
       <nav id="site-nav" class="nav" aria-label="Primary">
         <a href="index.html">Home</a>
         <a href="diagnose.html">Diagnosis</a>
+        <a href="history.html" aria-current="page">History</a>
         <a href="diseases.html">Disease Library</a>
         <a href="education.html">Education</a>
         <a href="safety.html">Safety</a>
@@ -31,18 +32,12 @@
     <div class="container">
       <div class="section-head reveal reveal-up">
         <h1><span class="icon" data-icon="history"></span>Full Analysis History</h1>
-        <p>Filter stored local runs by predicted class for audit and teaching review.</p>
+        <p>Filter and manage stored backend predictions for audit and teaching review.</p>
       </div>
       <div class="card reveal reveal-up">
         <div class="history-filters">
           <label for="history-filter">Filter by class:</label>
-          <select id="history-filter">
-            <option value="all">All</option>
-            <option value="Normal">Normal</option>
-            <option value="Conjunctivitis">Conjunctivitis</option>
-            <option value="Pterygium">Pterygium</option>
-            <option value="Keratitis">Keratitis</option>
-          </select>
+          <select id="history-filter"><option value="all">All</option></select>
           <button id="clear-all-history" class="btn btn-ghost" type="button">Clear All</button>
         </div>
         <div id="history-full" class="history-grid"></div>

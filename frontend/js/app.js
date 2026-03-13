@@ -2,21 +2,7 @@
   "use strict";
 
   const STORAGE_THEME = "doa-theme";
-  const STORAGE_HISTORY = "doa-history";
-  const DISEASES_DATA = {
-    normal: {
-      id: "normal",
-      name: "Normal",
-      name_ar: "طبيعي",
-      short: "Healthy anterior eye appearance with no obvious inflammatory or degenerative signs.",
-      short_ar: "مظهر طبيعي للجزء الأمامي من العين دون علامات واضحة لالتهاب أو تغيرات مرضية.",
-      symptoms_ar: ["لا يوجد ألم", "لا يوجد احمرار ملحوظ", "رؤية مستقرة وواضحة"],
-      red_flags_ar: ["انخفاض مفاجئ في الرؤية", "ألم شديد بالعين", "إصابة مباشرة أو صدمة للعين"],
-      safe_tips_ar: ["استخدم نظارات واقية من الأشعة فوق البنفسجية", "تجنب فرك العين باليد", "حافظ على الفحص الدوري للعين"],
-      when_to_see_doctor_ar: "راجع طبيب العيون فوراً عند ظهور ألم شديد أو احمرار مستمر أو تدهور مفاجئ في الرؤية.",
-      risk_level: "Low"
-    }
-  };
+  const API_BASE = (window.DOA_API_BASE || localStorage.getItem("doa-api-base") || "http://127.0.0.1:8000/api/v1").replace(/\/+$/, "");
   let diseases = null;
 
   initIcons();
@@ -28,12 +14,17 @@
   initTiltCards();
   initHeroParallax();
 
-  loadDiseases().then(() => {
+  loadDiseases().catch(() => {
+    diseases = {};
+  }).then(() => {
     const page = document.body.dataset.page;
     if (page === "home") renderHomeDiseases();
     if (page === "diseases") initDiseasesPage();
     if (page === "diagnose") initDiagnosePage();
     if (page === "history") initHistoryPage();
+    if (page === "about") initAboutPage();
+    if (page === "safety") initSafetyPage();
+    if (page === "education") initEducationPage();
   });
 
   function initIcons() {
@@ -178,13 +169,14 @@
   }
 
   async function loadDiseases() {
-    try {
-      const response = await fetch("../data/diseases.json");
-      if (!response.ok) throw new Error("fetch failed");
-      diseases = await response.json();
-    } catch (_error) {
-      diseases = DISEASES_DATA;
+    const items = await listLibrary();
+    if (!Array.isArray(items) || !items.length) {
+      throw new Error("No disease library data from backend");
     }
+    diseases = items.reduce((acc, item) => {
+      acc[item.id] = item;
+      return acc;
+    }, {});
   }
 
   function allDiseases() {
@@ -210,15 +202,27 @@
 
   function initDiseasesPage() {
     const search = byId("disease-search");
-    const nav = byId("disease-nav");
+    const tabs = byId("library-tabs");
     const sections = byId("disease-sections");
-    if (!search || !nav || !sections) return;
+    if (!search || !sections || !tabs) return;
 
-    const render = (term = "") => {
-      const query = term.trim().toLowerCase();
-      const filtered = allDiseases().filter((d) => d.name.toLowerCase().includes(query) || d.name_ar.includes(term));
+    let selectedDisease = "";
 
-      nav.innerHTML = filtered.map((d) => `<a href="#${d.id}">${escapeHtml(d.name)}</a>`).join("");
+    const render = async () => {
+      const term = search.value.trim();
+      const diseaseName = selectedDisease.trim();
+      let filtered = [];
+      try {
+        filtered = await listLibrary(term, diseaseName || null);
+      } catch (_err) {
+        sections.innerHTML = "<article class='card'><p class='small'>Failed to load library data from backend.</p></article>";
+        return;
+      }
+
+      if (!filtered.length) {
+        sections.innerHTML = "<article class='card'><p class='small'>No matching diseases found.</p></article>";
+        return;
+      }
 
       sections.innerHTML = filtered.map((d, i) => `
         <article id="${d.id}" class="card reveal ${i % 2 ? "reveal-right" : "reveal-left"}">
@@ -238,7 +242,18 @@
       initRipple();
     };
 
-    search.addEventListener("input", (e) => render(e.target.value));
+    search.addEventListener("input", () => render());
+    tabs.querySelectorAll(".tab-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        selectedDisease = btn.getAttribute("data-disease") || "";
+        tabs.querySelectorAll(".tab-btn").forEach((node) => {
+          const active = node === btn;
+          node.classList.toggle("active", active);
+          node.setAttribute("aria-selected", String(active));
+        });
+        render();
+      });
+    });
     render();
   }
 
@@ -262,6 +277,8 @@
 
     let currentFile = null;
     let currentDataURL = "";
+    let currentRecordId = null;
+    let currentImageId = null;
 
     renderHistoryPreview();
 
@@ -324,49 +341,49 @@
       skeleton.classList.remove("hidden");
       result.classList.add("hidden");
       toast("Analyze started", "info");
+      try {
+        if (!currentImageId) {
+          const uploaded = await uploadImage(currentFile);
+          currentRecordId = uploaded.id;
+          currentImageId = uploaded.image_id;
+        }
 
-      await delay(900);
+        const predicted = await getPrediction(currentImageId);
+        currentRecordId = predicted.id;
+        const stored = await getResult(currentRecordId);
 
-      const probs = generateProbabilities(allDiseases().map((d) => d.id));
-      const sorted = [...probs].sort((a, b) => b.value - a.value);
-      const top = sorted[0];
-      const detail = diseases[top.id];
+        result.innerHTML = renderApiResultContent(stored);
+        skeleton.classList.add("hidden");
+        result.classList.remove("hidden");
+        loadingLine.classList.add("hidden");
+        setStatus(status, "done", "Result ready");
+        bindAccordions(result);
+        initRipple();
+        toast("Result ready", "success");
 
-      result.innerHTML = renderResultContent(sorted, detail);
-      skeleton.classList.add("hidden");
-      result.classList.remove("hidden");
-      loadingLine.classList.add("hidden");
-      setStatus(status, "done", "Result ready");
-
-      animateBars(result);
-      bindAccordions(result);
-      initRipple();
-      toast("Result ready", "success");
-
-      const saveBtn = byId("save-history-btn");
-      if (saveBtn) {
-        saveBtn.addEventListener("click", () => {
-          const item = {
-            id: uid(),
-            thumbnail: currentDataURL,
-            date: new Date().toLocaleString(),
-            topClass: detail.name,
-            confidence: Number((top.value * 100).toFixed(1)),
-            probabilities: sorted.map((p) => ({ id: p.id, value: Number((p.value * 100).toFixed(1)) }))
-          };
-
-          const history = getHistory();
-          history.unshift(item);
-          localStorage.setItem(STORAGE_HISTORY, JSON.stringify(history));
-          renderHistoryPreview();
-          toast("Saved to history", "success");
-        });
+        const saveBtn = byId("save-history-btn");
+        if (saveBtn) {
+          saveBtn.addEventListener("click", () => {
+            toast("Result is already stored in backend history", "info");
+          });
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Analysis failed";
+        setStatus(status, "error", "Analysis failed");
+        result.innerHTML = `<p class="small">Unable to complete analysis: ${escapeHtml(msg)}</p>`;
+        result.classList.remove("hidden");
+        toast(msg, "error");
+      } finally {
+        skeleton.classList.add("hidden");
+        loadingLine.classList.add("hidden");
       }
     });
 
     resetBtn.addEventListener("click", () => {
       currentFile = null;
       currentDataURL = "";
+      currentRecordId = null;
+      currentImageId = null;
       imageInput.value = "";
       preview.innerHTML = "<p>No image selected.</p>";
       analyzeBtn.disabled = true;
@@ -399,6 +416,8 @@
       reader.onload = () => {
         currentFile = file;
         currentDataURL = String(reader.result || "");
+        currentRecordId = null;
+        currentImageId = null;
         preview.innerHTML = `<img src="${currentDataURL}" alt="Selected eye image preview" />`;
         analyzeBtn.disabled = false;
         resetBtn.disabled = false;
@@ -409,10 +428,20 @@
       reader.readAsDataURL(file);
     }
 
-    function renderHistoryPreview() {
-      const list = getHistory().slice(0, 3);
+    async function renderHistoryPreview() {
+      let list = [];
+      try {
+        list = (await listResults()).slice(0, 3).map((r) => ({
+          topClass: r.prediction || "Unknown",
+          confidence: Number((Number(r.confidence || 0) * 100).toFixed(1)),
+          date: r.created_at ? new Date(r.created_at).toLocaleString() : "Unknown"
+        }));
+      } catch (_err) {
+        historyPreview.innerHTML = "<li class='small'>Unable to load history from backend.</li>";
+        return;
+      }
       if (!list.length) {
-        historyPreview.innerHTML = "<li class='small'>No saved cases yet.</li>";
+        historyPreview.innerHTML = "<li class='small'>No stored backend results yet.</li>";
         return;
       }
 
@@ -438,55 +467,46 @@
     }
   }
 
-  function renderResultContent(sorted, detail) {
-    const riskClass = String(detail.risk_level || "low").toLowerCase();
+  function renderApiResultContent(record) {
+    const confidencePercent = Number(record.confidence || 0) * 100;
+    const disease = findDiseaseByPrediction(record.prediction);
+    const riskLevel = disease ? disease.risk_level : "Unknown";
+    const riskClass = String(riskLevel || "low").toLowerCase();
+    const created = record.created_at ? new Date(record.created_at).toLocaleString() : "Unknown";
 
     return `
       <div class="result-header ltr">
-        <span class="badge"><span class="icon">${getIconByName("activity")}</span>Top: ${escapeHtml(detail.name)}</span>
-        <span class="badge">Confidence: ${(sorted[0].value * 100).toFixed(1)}%</span>
-        <span class="badge ${riskClass}">Risk: ${escapeHtml(detail.risk_level)}</span>
-      </div>
-
-      <div class="rtl-box rtl" lang="ar" dir="rtl">
-        <h3>ملخص الحالة</h3>
-        <p>${escapeHtml(detail.short_ar)}</p>
+        <span class="badge"><span class="icon">${getIconByName("activity")}</span>Prediction: ${escapeHtml(record.prediction || "Unknown")}</span>
+        <span class="badge">Confidence: ${confidencePercent.toFixed(1)}%</span>
+        <span class="badge ${riskClass}">Risk: ${escapeHtml(riskLevel)}</span>
       </div>
 
       <div class="result-grid ltr">
         <article class="card">
-          <h3>What this may mean</h3>
-          <p>This simulated classification suggests patterns compatible with <strong>${escapeHtml(detail.name)}</strong>. Clinical assessment remains required.</p>
+          <h3>Result Metadata</h3>
+          <ul>
+            <li><strong>Record ID:</strong> ${escapeHtml(record.id)}</li>
+            <li><strong>Created:</strong> ${escapeHtml(created)}</li>
+            <li><strong>Image Path:</strong> ${escapeHtml(record.image_path || "N/A")}</li>
+          </ul>
         </article>
         <article class="card">
-          <h3>What you can do now</h3>
-          <ul>${detail.safe_tips_ar.map((tip) => `<li><div class="rtl" lang="ar" dir="rtl">${escapeHtml(tip)}</div></li>`).join("")}</ul>
+          <h3>Clinical Note</h3>
+          <p>This is a mock-AI prediction for integration testing. Confirm clinically before action.</p>
         </article>
-      </div>
-
-      <div class="rtl-box warning rtl" lang="ar" dir="rtl">
-        <h3>علامات إنذار</h3>
-        <ul>${detail.red_flags_ar.map((flag) => `<li>${escapeHtml(flag)}</li>`).join("")}</ul>
-      </div>
-
-      <div class="rtl-box rtl" lang="ar" dir="rtl">
-        <h3>متى يجب مراجعة الطبيب</h3>
-        <p>${escapeHtml(detail.when_to_see_doctor_ar)}</p>
-      </div>
-
-      <div class="bars ltr">
-        ${sorted.map((p, i) => `
-          <div class="bar-row">
-            <div class="bar-label"><span>${escapeHtml(diseases[p.id].name)}</span><span>${(p.value * 100).toFixed(1)}%</span></div>
-            <div class="bar-track"><div class="bar-fill" data-target="${(p.value * 100).toFixed(1)}" style="transition-delay:${i * 90}ms"></div></div>
-          </div>
-        `).join("")}
       </div>
 
       ${accordionMarkup([
-        { title: "Overview (AR)", content: `<div class="rtl" lang="ar" dir="rtl">${escapeHtml(detail.short_ar)}</div>` },
-        { title: "Symptoms (AR)", content: `<div class="rtl" lang="ar" dir="rtl"><ul>${detail.symptoms_ar.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul></div>` },
-        { title: "Urgent Signs (AR)", content: `<div class="rtl" lang="ar" dir="rtl"><ul>${detail.red_flags_ar.map((f) => `<li>${escapeHtml(f)}</li>`).join("")}</ul></div>` }
+        {
+          title: "API Response",
+          content: `<pre class="api-json">${escapeHtml(JSON.stringify(record, null, 2))}</pre>`
+        },
+        {
+          title: "Patient-safe Note",
+          content: disease
+            ? `<div class="rtl" lang="ar" dir="rtl">${escapeHtml(disease.when_to_see_doctor_ar)}</div>`
+            : "No disease-specific note available for this label."
+        }
       ])}
 
       <div class="actions ltr">
@@ -501,10 +521,15 @@
     const clearAll = byId("clear-all-history");
     if (!filter || !container || !clearAll) return;
 
-    const render = () => {
+    const render = async () => {
       const value = filter.value;
-      const history = getHistory();
-      const rows = value === "all" ? history : history.filter((h) => h.topClass === value);
+      let rows = [];
+      try {
+        rows = await listResults(value === "all" ? null : value);
+      } catch (_err) {
+        container.innerHTML = "<p class='small'>Failed to load backend results.</p>";
+        return;
+      }
 
       if (!rows.length) {
         container.innerHTML = "<p class='small'>No entries for this filter.</p>";
@@ -513,36 +538,157 @@
 
       container.innerHTML = rows.map((row) => `
         <article class="history-entry">
-          <img src="${row.thumbnail}" alt="History thumbnail" />
+          <div class="history-placeholder">${escapeHtml((row.prediction || "?").slice(0, 1).toUpperCase())}</div>
           <div class="stack">
-            <h3>${escapeHtml(row.topClass)} (${row.confidence}%)</h3>
-            <p class="small">${escapeHtml(row.date)}</p>
-            <p class="small">${row.probabilities.map((p) => `${escapeHtml(diseases[p.id].name)} ${p.value}%`).join(" | ")}</p>
+            <h3>${escapeHtml(row.prediction || "Unknown")} (${(Number(row.confidence || 0) * 100).toFixed(1)}%)</h3>
+            <p class="small">${escapeHtml(row.created_at ? new Date(row.created_at).toLocaleString() : "Unknown")}</p>
+            <p class="small">Record ID: ${escapeHtml(row.id)} | ${escapeHtml(row.image_path || "N/A")}</p>
           </div>
           <button class="btn btn-ghost" type="button" data-remove="${row.id}">Remove</button>
         </article>
       `).join("");
 
       container.querySelectorAll("[data-remove]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const next = getHistory().filter((item) => item.id !== btn.getAttribute("data-remove"));
-          localStorage.setItem(STORAGE_HISTORY, JSON.stringify(next));
-          render();
-          toast("History item removed", "info");
+        btn.addEventListener("click", async () => {
+          const id = btn.getAttribute("data-remove");
+          try {
+            await deleteResult(id);
+            await render();
+            toast("History item removed", "info");
+          } catch (_err) {
+            toast("Failed to delete result", "error");
+          }
         });
       });
 
       initRipple();
     };
 
-    filter.addEventListener("change", render);
-    clearAll.addEventListener("click", () => {
-      localStorage.removeItem(STORAGE_HISTORY);
-      render();
-      toast("All history cleared", "info");
+    const initFilterOptions = async () => {
+      try {
+        const all = await listResults();
+        const labels = Array.from(new Set(all.map((r) => r.prediction).filter(Boolean))).sort();
+        filter.innerHTML = `<option value="all">All</option>${labels.map((label) => `<option value="${escapeHtml(label)}">${escapeHtml(label)}</option>`).join("")}`;
+      } catch (_err) {
+        filter.innerHTML = `<option value="all">All</option>`;
+      }
+    };
+
+    filter.addEventListener("change", () => { render(); });
+    clearAll.addEventListener("click", async () => {
+      try {
+        const all = await listResults();
+        await Promise.all(all.map((item) => deleteResult(item.id)));
+        await render();
+        toast("All backend history cleared", "info");
+      } catch (_err) {
+        toast("Failed to clear backend history", "error");
+      }
     });
 
-    render();
+    initFilterOptions().then(() => render());
+  }
+
+
+  async function initAboutPage() {
+    const target = byId("about-content");
+    if (!target) return;
+    try {
+      const payload = await getSectionContent("about");
+      const content = payload.content || {};
+      target.innerHTML = `
+        <article class="card stack reveal reveal-up">
+          <h1>${escapeHtml(payload.title || "About")}</h1>
+          <p><strong>${escapeHtml(content.subtitle || "")}</strong></p>
+          <p>${escapeHtml(content.description || "")}</p>
+          <p><strong>${escapeHtml(content.project_title || "")}</strong></p>
+          <p>Supervised by: ${escapeHtml(content.supervisor || "N/A")}</p>
+        </article>
+        <article class="card stack reveal reveal-up">
+          <h2>Team Members</h2>
+          <ol class="stack page-list">${(content.team_members || []).map((member) => `<li>${escapeHtml(member)}</li>`).join("")}</ol>
+        </article>
+        <div class="grid grid-2 stagger reveal reveal-scale">
+          <article class="card stack">
+            <h2>Stack</h2>
+            <ul class="stack">${(content.stack || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+          </article>
+          <article class="card stack">
+            <h2>Datasets</h2>
+            <ul class="stack">${(content.datasets || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+          </article>
+        </div>
+      `;
+      initRevealSystem();
+      initRipple();
+    } catch (_err) {
+      target.innerHTML = "<article class='card'><p class='small'>Unable to load About content from backend.</p></article>";
+    }
+  }
+
+  async function initSafetyPage() {
+    const target = byId("safety-content");
+    if (!target) return;
+    try {
+      const payload = await getSectionContent("safety");
+      const content = payload.content || {};
+      target.innerHTML = `
+        <div class="warning-banner reveal reveal-up">
+          <span class="icon" data-icon="warning"></span>
+          <div class="stack">
+            <h1>${escapeHtml(payload.title || "Safety")}</h1>
+            <p>${escapeHtml(content.intro || "")}</p>
+          </div>
+        </div>
+        <div class="grid grid-2 stagger reveal reveal-up">
+          ${(content.cards || []).map((card) => `
+            <article class="card stack">
+              <h2>${escapeHtml(card.title || "")}</h2>
+              <p class="small">${escapeHtml(card.content || "")}</p>
+            </article>
+          `).join("")}
+        </div>
+        <article class="card reveal reveal-scale stack">
+          <h2>Clinical Escalation Advice</h2>
+          <p class="small">${escapeHtml(content.escalation_advice || "")}</p>
+        </article>
+      `;
+      initIcons();
+      initRevealSystem();
+    } catch (_err) {
+      target.innerHTML = "<article class='card'><p class='small'>Unable to load Safety content from backend.</p></article>";
+    }
+  }
+
+  async function initEducationPage() {
+    const target = byId("education-content");
+    if (!target) return;
+    try {
+      const payload = await getSectionContent("education");
+      const content = payload.content || {};
+      target.innerHTML = `
+        <div class="section-head reveal reveal-up">
+          <h1>${escapeHtml(payload.title || "Education")}</h1>
+          <p>${escapeHtml(content.intro || "")}</p>
+        </div>
+        <div class="grid grid-3 stagger reveal reveal-up">
+          ${(content.blocks || []).map((block) => `
+            <article class="card tilt-card stack">
+              <h2>${escapeHtml(block.title || "")}</h2>
+              <ul class="stack">${(block.items || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+              <div class="rtl rtl-box" lang="ar" dir="rtl">
+                <h3>${escapeHtml(block.arabic_title || "")}</h3>
+                <p>${escapeHtml(block.arabic_text || "")}</p>
+              </div>
+            </article>
+          `).join("")}
+        </div>
+      `;
+      initRevealSystem();
+      initTiltCards();
+    } catch (_err) {
+      target.innerHTML = "<article class='card'><p class='small'>Unable to load Education content from backend.</p></article>";
+    }
   }
 
   function accordionMarkup(items) {
@@ -572,32 +718,53 @@
     });
   }
 
-  function animateBars(scope) {
-    requestAnimationFrame(() => {
-      scope.querySelectorAll(".bar-fill").forEach((bar) => {
-        bar.style.inlineSize = `${bar.getAttribute("data-target")}%`;
-      });
-    });
-  }
-
   function setStatus(node, state, text) {
     node.className = `status ${state}`;
     node.innerHTML = `<span class="dot"></span>${escapeHtml(text)}`;
   }
 
-  function generateProbabilities(ids) {
-    const raw = ids.map(() => Math.random());
-    const sum = raw.reduce((a, b) => a + b, 0);
-    return raw.map((v, i) => ({ id: ids[i], value: v / sum }));
+  function findDiseaseByPrediction(prediction) {
+    const target = String(prediction || "").toLowerCase();
+    return allDiseases().find((d) => String(d.name || "").toLowerCase() === target) || null;
   }
 
-  function getHistory() {
+  async function uploadImage(file) {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await fetch(`${API_BASE}/upload`, { method: "POST", body: formData });
+    const data = await parseApiResponse(response);
+    if (!data.image_id) throw new Error("Upload succeeded but no image_id returned");
+    return data;
+  }
+
+  async function getPrediction(imageId) {
+    const response = await fetch(`${API_BASE}/predict`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image_id: imageId })
+    });
+    return parseApiResponse(response);
+  }
+
+  async function getResult(id) {
+    const response = await fetch(`${API_BASE}/results/${encodeURIComponent(id)}`);
+    return parseApiResponse(response);
+  }
+
+  async function parseApiResponse(response) {
+    let data = null;
     try {
-      const parsed = JSON.parse(localStorage.getItem(STORAGE_HISTORY) || "[]");
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (_e) {
-      return [];
+      data = await response.json();
+    } catch (_err) {
+      data = null;
     }
+
+    if (!response.ok) {
+      const detail = data && data.detail ? String(data.detail) : `Request failed (${response.status})`;
+      throw new Error(detail);
+    }
+
+    return data || {};
   }
 
   function toast(text, type = "info") {
@@ -612,8 +779,30 @@
   }
 
   function byId(id) { return document.getElementById(id); }
+  async function listResults(prediction = null) {
+    const url = prediction
+      ? `${API_BASE}/results?prediction=${encodeURIComponent(prediction)}`
+      : `${API_BASE}/results`;
+    const response = await fetch(url);
+    return parseApiResponse(response);
+  }
+  async function deleteResult(id) {
+    const response = await fetch(`${API_BASE}/results/${encodeURIComponent(id)}`, { method: "DELETE" });
+    return parseApiResponse(response);
+  }
   function delay(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
-  function uid() { return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
+  async function getSectionContent(sectionType) {
+    const response = await fetch(`${API_BASE}/content/${encodeURIComponent(sectionType)}`);
+    return parseApiResponse(response);
+  }
+  async function listLibrary(q = "", diseaseName = null) {
+    const params = new URLSearchParams();
+    if (q && q.trim()) params.set("q", q.trim());
+    if (diseaseName && diseaseName.trim()) params.set("name", diseaseName.trim());
+    const query = params.toString();
+    const response = await fetch(`${API_BASE}/library${query ? `?${query}` : ""}`);
+    return parseApiResponse(response);
+  }
   function escapeHtml(text) {
     return String(text)
       .replace(/&/g, "&amp;")

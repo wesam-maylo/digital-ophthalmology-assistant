@@ -38,7 +38,13 @@
         <aside class="card sticky-card stack reveal reveal-left" aria-label="Quick navigation">
           <h2>Quick Navigation</h2>
           <input id="disease-search" class="search" type="search" placeholder="Search condition..." aria-label="Search diseases" />
-          <nav id="disease-nav" class="side-nav"></nav>
+          <div id="library-tabs" class="tabs" role="tablist" aria-label="Disease filters">
+            <button class="tab-btn active" type="button" role="tab" aria-selected="true" data-disease="">All</button>
+            <button class="tab-btn" type="button" role="tab" aria-selected="false" data-disease="Conjunctivitis">Conjunctivitis</button>
+            <button class="tab-btn" type="button" role="tab" aria-selected="false" data-disease="Keratitis">Keratitis</button>
+            <button class="tab-btn" type="button" role="tab" aria-selected="false" data-disease="Normal">Normal</button>
+            <button class="tab-btn" type="button" role="tab" aria-selected="false" data-disease="Pterygium">Pterygium</button>
+          </div>
         </aside>
 
         <section id="disease-sections" class="stack reveal reveal-right"></section>
@@ -51,5 +57,4 @@
   <footer class="footer"><div class="container"><p>Educational platform interface only. Not a substitute for licensed medical diagnosis.</p></div></footer>
 </body>
 </html>
-
 
