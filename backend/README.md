@@ -119,4 +119,3 @@ Table:
 - AI service is mocked in `app/services/ai_service.py`:
   - `predict_image(path) -> ("Normal", 0.85)`
 - Replace mock logic with your real model when ready.
-<!--  -->
